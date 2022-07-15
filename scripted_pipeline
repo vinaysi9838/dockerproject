@@ -1,0 +1,36 @@
+node{
+    stage("pull source code from GITHUB"){
+        git branch: 'main', url: 'https://github.com/vinaysi9838/dockerproject.git'
+    }
+    
+    stage("build docker image"){
+    sh 'docker image build -t $JOB_NAME:v1.$BUILD_ID .'
+    sh 'docker image tag $JOB_NAME:v1.$BUILD_ID  vinay9838/$JOB_NAME:v1.$BUILD_ID'
+    sh 'docker image tag $JOB_NAME:v1.$BUILD_ID  vinay9838/$JOB_NAME:latest'
+    }
+    
+    stage("push image to docker hub"){
+        withCredentials([string(credentialsId: 'dockerpasswd', variable: 'dockderhubpasswd')]) {
+    // some block
+    sh 'docker login -u vinay9838 -p ${dockderhubpasswd}'
+    sh 'docker image push vinay9838/$JOB_NAME:v1.$BUILD_ID'
+    sh 'docker image push vinay9838/$JOB_NAME:latest'
+    sh 'docker rmi -f $JOB_NAME:v1.$BUILD_ID vinay9838/$JOB_NAME:v1.$BUILD_ID vinay9838/$JOB_NAME:latest'
+}
+        
+    }
+    stage("deploy the container in prod"){
+        def dockerprod = 'docker run -p 1234:80 -d --name dockercicd vinay9838/docker-ci-cd:latest'
+        def containerrm = 'docker container rm -f dockercicd'
+        def imagerm = 'docker rmi -f vinay9838/docker-ci-cd'
+        
+        sshagent(['dockerprod']) {
+    // some block
+    sh "ssh -o StrictHostKeyChecking=no ubuntu@3.84.72.36 ${containerrm}"
+    sh "ssh -o StrictHostKeyChecking=no ubuntu@3.84.72.36 ${imagerm}"
+    sh "ssh -o StrictHostKeyChecking=no ubuntu@3.84.72.36 ${dockerprod}"
+            
+}
+    }
+    
+}
